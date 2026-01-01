@@ -39,17 +39,19 @@ class ChatService {
         },
       });
       if (!response.ok) {
-        let errorMsg = `Server error: ${response.status}`;
+        let errBody;
         try {
-          const errData = await response.json();
-          errorMsg = errData.error || errorMsg;
-        } catch { /* ignore parse error */ }
-        return { success: false, error: errorMsg };
+          errBody = await response.clone().json();
+        } catch {
+          errBody = await response.clone().text().catch(() => response.statusText);
+        }
+        console.error(`HTTP ${response.status} ${path}:`, {status:response.status, statusText:response.statusText, body:errBody});
+        return { success: false, error: errBody?.error || errBody || `Server responded ${response.status}` };
       }
-      const data = await response.json();
-      return { success: true, data: data.data };
+      const rawData = await response.json();
+      return { success: true, data: rawData.data ?? rawData };
     } catch (error) {
-      console.error(`API Request failed [${path}]:`, error);
+      console.error(`Network/Fetch error on ${path}:`, error, {message: error?.message, stack: error?.stack, stringified: String(error)});
       return { success: false, error: error instanceof Error ? error.message : 'Network request failed' };
     }
   }
@@ -66,8 +68,14 @@ class ChatService {
         body: JSON.stringify({ message, model, stream: !!onChunk, threadId }),
       });
       if (!response.ok) {
-        const err = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
-        return { success: false, error: err.error || 'Failed to send message' };
+        let errBody;
+        try {
+          errBody = await response.clone().json();
+        } catch {
+          errBody = await response.clone().text().catch(() => response.statusText);
+        }
+        console.error(`HTTP ${response.status} ${this.baseUrl}/chat:`, {status:response.status, statusText:response.statusText, body:errBody});
+        return { success: false, error: errBody?.error || errBody || `Server responded ${response.status}` };
       }
       if (onChunk && response.body) {
         const reader = response.body.getReader();
@@ -84,9 +92,10 @@ class ChatService {
         }
         return { success: true };
       }
-      const data = await response.json();
-      return { success: true, data: data.data };
+      const rawData = await response.json();
+      return { success: true, data: rawData.data ?? rawData };
     } catch (error) {
+      console.error(`Send message failed:`, error);
       return { success: false, error: 'Failed to connect to agent service' };
     }
   }
