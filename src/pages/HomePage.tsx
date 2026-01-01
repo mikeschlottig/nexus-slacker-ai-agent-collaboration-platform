@@ -1,138 +1,73 @@
-// Home page of the app.
-// Currently a demo placeholder "please wait" screen.
-// Replace this file with your actual app UI. Do not delete it to use some other file as homepage. Simply replace the entire contents of this file.
-
-import { useEffect, useMemo, useState } from 'react'
-import { Sparkles } from 'lucide-react'
-
-import { ThemeToggle } from '@/components/ThemeToggle'
-import { HAS_TEMPLATE_DEMO, TemplateDemo } from '@/components/TemplateDemo'
-import { Button } from '@/components/ui/button'
-import { Toaster, toast } from '@/components/ui/sonner'
-
-function formatDuration(ms: number): string {
-  const total = Math.max(0, Math.floor(ms / 1000))
-  const m = Math.floor(total / 60)
-  const s = total % 60
-  return `${m}:${s.toString().padStart(2, '0')}`
-}
-
+import React, { useEffect, useState } from 'react';
+import { WorkspaceLayout } from '@/components/workspace/WorkspaceLayout';
+import { chatService } from '@/lib/chat';
+import type { SessionInfo } from '../../worker/types';
+import { Toaster, toast } from '@/components/ui/sonner';
 export function HomePage() {
-  const [coins, setCoins] = useState(0)
-  const [isRunning, setIsRunning] = useState(false)
-  const [startedAt, setStartedAt] = useState<number | null>(null)
-  const [elapsedMs, setElapsedMs] = useState(0)
-
-  useEffect(() => {
-    if (!isRunning || startedAt === null) return
-
-    const t = setInterval(() => {
-      setElapsedMs(Date.now() - startedAt)
-    }, 250)
-
-    return () => clearInterval(t)
-  }, [isRunning, startedAt])
-
-  const formatted = useMemo(() => formatDuration(elapsedMs), [elapsedMs])
-
-  const onPleaseWait = () => {
-    setCoins((c) => c + 1)
-
-    if (!isRunning) {
-      // Resume from the current elapsed time
-      setStartedAt(Date.now() - elapsedMs)
-      setIsRunning(true)
-      toast.success('Building your app…', {
-        description: "Hang tight — we're setting everything up.",
-      })
-      return
+  const [channels, setChannels] = useState<SessionInfo[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const fetchSessions = async () => {
+    try {
+      const response = await chatService.listSessions();
+      if (response.success && response.data) {
+        setChannels(response.data);
+        if (response.data.length > 0 && !activeSessionId) {
+          setActiveSessionId(response.data[0].id);
+        } else if (response.data.length === 0) {
+          // Create default channel if none exist
+          const newSession = await chatService.createSession('#general');
+          if (newSession.success && newSession.data) {
+            setChannels([newSession.data as any]);
+            setActiveSessionId(newSession.data.sessionId);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load workspace:', err);
+      toast.error('Failed to load workspace channels');
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsRunning(false)
-    toast.info('Still working…', {
-      description: 'You can come back in a moment.',
-    })
-  }
-
-  const onReset = () => {
-    setCoins(0)
-    setIsRunning(false)
-    setStartedAt(null)
-    setElapsedMs(0)
-    toast('Reset complete')
-  }
-
-  const onAddCoin = () => {
-    setCoins((c) => c + 1)
-    toast('Coin added')
-  }
-
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground p-4 overflow-hidden relative">
-      <ThemeToggle />
-      <div className="absolute inset-0 bg-gradient-rainbow opacity-10 dark:opacity-20 pointer-events-none" />
-
-      <div className="text-center space-y-8 relative z-10 animate-fade-in w-full">
-        <div className="flex justify-center">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-primary flex items-center justify-center shadow-primary floating">
-            <Sparkles className="w-8 h-8 text-white rotating" />
-          </div>
+  };
+  useEffect(() => {
+    fetchSessions();
+  }, []);
+  const handleChannelSelect = (id: string) => {
+    setActiveSessionId(id);
+    chatService.switchSession(id);
+  };
+  const handleChannelCreated = async (title: string) => {
+    const res = await chatService.createSession(title);
+    if (res.success && res.data) {
+      toast.success(`Channel ${title} created`);
+      await fetchSessions();
+      setActiveSessionId(res.data.sessionId);
+      chatService.switchSession(res.data.sessionId);
+    }
+  };
+  if (isLoading) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-[#3F0E40] text-white">
+        <div className="animate-pulse flex flex-col items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-white/20" />
+          <p className="text-sm font-medium opacity-70">Loading Nexus...</p>
         </div>
-
-        <div className="space-y-3">
-          <h1 className="text-5xl md:text-7xl font-display font-bold text-balance leading-tight">
-            Creating your <span className="text-gradient">app</span>
-          </h1>
-          <p className="text-lg md:text-xl text-muted-foreground max-w-xl mx-auto text-pretty">
-            Your application would be ready soon.
-          </p>
-        </div>
-
-        {HAS_TEMPLATE_DEMO ? (
-          <div className="max-w-5xl mx-auto text-left">
-            <TemplateDemo />
-          </div>
-        ) : (
-          <>
-            <div className="flex justify-center gap-4">
-              <Button
-                size="lg"
-                onClick={onPleaseWait}
-                className="btn-gradient px-8 py-4 text-lg font-semibold hover:-translate-y-0.5 transition-all duration-200"
-                aria-live="polite"
-              >
-                Please Wait
-              </Button>
-            </div>
-
-            <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground">
-              <div>
-                Time elapsed:{' '}
-                <span className="font-medium tabular-nums text-foreground">{formatted}</span>
-              </div>
-              <div>
-                Coins:{' '}
-                <span className="font-medium tabular-nums text-foreground">{coins}</span>
-              </div>
-            </div>
-
-            <div className="flex justify-center gap-2">
-              <Button variant="outline" size="sm" onClick={onReset}>
-                Reset
-              </Button>
-              <Button variant="outline" size="sm" onClick={onAddCoin}>
-                Add Coin
-              </Button>
-            </div>
-          </>
-        )}
       </div>
-
-      <footer className="absolute bottom-8 text-center text-muted-foreground/80">
-        <p>Powered by Cloudflare</p>
-      </footer>
-
-      <Toaster richColors closeButton />
+    );
+  }
+  return (
+    <div className="h-screen w-screen overflow-hidden flex flex-col bg-background">
+      <WorkspaceLayout 
+        channels={channels}
+        activeSessionId={activeSessionId}
+        onChannelSelect={handleChannelSelect}
+        onChannelCreate={handleChannelCreated}
+      />
+      <Toaster richColors position="top-center" />
+      <div className="fixed bottom-4 right-4 text-[10px] text-muted-foreground/50 z-50 pointer-events-none">
+        Nexus AI • Usage Limits Apply
+      </div>
     </div>
-  )
+  );
 }
