@@ -10,16 +10,25 @@ export class ChatAgent extends Agent<Env, ChatState> {
     messages: [],
     sessionId: crypto.randomUUID(),
     isProcessing: false,
-    model: 'google-ai-studio/gemini-2.5-flash'
+    model: 'google-ai-studio/gemini-2.0-flash'
   };
   async onStart(): Promise<void> {
+    if (!this.env.CF_AI_API_KEY) {
+      console.warn('[AGENT CONFIG ERROR] CF_AI_API_KEY is missing');
+    }
     this.chatHandler = new ChatHandler(
-      this.env.CF_AI_BASE_URL ,
-      this.env.CF_AI_API_KEY,
+      this.env.CF_AI_BASE_URL || '',
+      this.env.CF_AI_API_KEY || '',
       this.state.model
     );
   }
   async onRequest(request: Request): Promise<Response> {
+    if (!this.env.CF_AI_API_KEY) {
+      return Response.json({
+        success: false,
+        error: 'System Configuration Error: Missing AI API Key. Please contact administrator.'
+      }, { status: 500 });
+    }
     try {
       const url = new URL(request.url);
       const method = request.method;
@@ -43,7 +52,8 @@ export class ChatAgent extends Agent<Env, ChatState> {
       console.error('Request handling error:', error);
       return Response.json({
         success: false,
-        error: API_RESPONSES.INTERNAL_ERROR
+        error: API_RESPONSES.INTERNAL_ERROR,
+        details: error instanceof Error ? error.message : String(error)
       }, { status: 500 });
     }
   }
@@ -83,7 +93,7 @@ export class ChatAgent extends Agent<Env, ChatState> {
       isProcessing: true
     });
     try {
-      if (!this.chatHandler) throw new Error('Chat handler not initialized');
+      if (!this.chatHandler) throw new Error('Chat handler failed to initialize');
       if (stream) {
         const { readable, writable } = new TransformStream();
         const writer = writable.getWriter();
@@ -98,11 +108,11 @@ export class ChatAgent extends Agent<Env, ChatState> {
               message,
               history,
               (chunk: string) => {
-                this.setState({
-                  ...this.state,
-                  streamingMessage: (this.state.streamingMessage || '') + chunk
+                this.setState({ 
+                  ...this.state, 
+                  streamingMessage: (this.state.streamingMessage || '') + chunk 
                 });
-                writer.write(encoder.encode(chunk));
+                writer.write(encoder.encode(chunk)).catch(e => console.error('Writer failed:', e));
               }
             );
             const assistantMessage = createMessage('assistant', response.content, response.toolCalls);
@@ -127,8 +137,8 @@ export class ChatAgent extends Agent<Env, ChatState> {
               streamingMessage: ''
             });
           } catch (error) {
-            console.error('Streaming error:', error);
-            const errorMsg = createMessage('assistant', 'Error processing request.');
+            console.error('Streaming response failed:', error);
+            const errorMsg = createMessage('assistant', 'Nexus encountered an error while processing your request.');
             if (threadId) errorMsg.threadId = threadId;
             this.setState({
               ...this.state,
@@ -137,7 +147,7 @@ export class ChatAgent extends Agent<Env, ChatState> {
               streamingMessage: ''
             });
           } finally {
-            writer.close();
+            try { writer.close(); } catch { /* ignore */ }
           }
         })();
         return createStreamResponse(readable);
@@ -165,7 +175,11 @@ export class ChatAgent extends Agent<Env, ChatState> {
       return Response.json({ success: true, data: this.state });
     } catch (error) {
       this.setState({ ...this.state, isProcessing: false });
-      return Response.json({ success: false, error: API_RESPONSES.PROCESSING_ERROR }, { status: 500 });
+      console.error('Chat error:', error);
+      return Response.json({ 
+        success: false, 
+        error: error instanceof Error ? error.message : API_RESPONSES.PROCESSING_ERROR 
+      }, { status: 500 });
     }
   }
   private handleClearMessages(): Response {

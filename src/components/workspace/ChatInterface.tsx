@@ -3,7 +3,7 @@ import { ChannelHeader } from './ChannelHeader';
 import { MessageList } from './MessageList';
 import { chatService } from '@/lib/chat';
 import { Button } from '@/components/ui/button';
-import { Send, Paperclip, Smile, RefreshCw } from 'lucide-react';
+import { Send, Paperclip, Smile, RefreshCw, Bold, Italic, Link2, List, Type, AtSign } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Message } from '../../../worker/types';
 interface ChatInterfaceProps {
@@ -73,7 +73,7 @@ export function ChatInterface({ sessionId, channelName, onThreadSelect }: ChatIn
         }
       );
       if (!res.success) {
-        console.error('Failed to send message');
+        console.error('Failed to send message:', res.error);
       }
     } catch (err) {
       console.error('Chat error:', err);
@@ -117,17 +117,18 @@ export function ChatInterface({ sessionId, channelName, onThreadSelect }: ChatIn
         />
       </div>
       <div className="p-4 pt-0">
-        <form
-          onSubmit={handleSendMessage}
-          className="relative group border rounded-lg bg-white dark:bg-zinc-900 focus-within:ring-1 focus-within:ring-ring transition-shadow"
-        >
-          <div className="flex items-center gap-1 p-2 border-b bg-muted/30">
-            <Button type="button" variant="ghost" size="icon" className="h-7 w-7"><Smile className="w-4 h-4 text-muted-foreground" /></Button>
-            <Button type="button" variant="ghost" size="icon" className="h-7 w-7"><Paperclip className="w-4 h-4 text-muted-foreground" /></Button>
+        <div className="relative group border rounded-xl bg-white dark:bg-zinc-900 focus-within:ring-2 focus-within:ring-ring focus-within:border-transparent transition-all shadow-sm">
+          <div className="flex items-center gap-0.5 p-1 border-b bg-muted/20 overflow-x-auto no-scrollbar">
+            <Button type="button" variant="ghost" size="icon" className="h-7 w-7"><Type className="w-3.5 h-3.5" /></Button>
+            <div className="w-[1px] h-4 bg-border mx-1" />
+            <Button type="button" variant="ghost" size="icon" className="h-7 w-7"><Bold className="w-3.5 h-3.5" /></Button>
+            <Button type="button" variant="ghost" size="icon" className="h-7 w-7"><Italic className="w-3.5 h-3.5" /></Button>
+            <Button type="button" variant="ghost" size="icon" className="h-7 w-7"><Link2 className="w-3.5 h-3.5" /></Button>
+            <Button type="button" variant="ghost" size="icon" className="h-7 w-7"><List className="w-3.5 h-3.5" /></Button>
           </div>
-          <div className="flex items-end p-2 gap-2">
+          <form onSubmit={handleSendMessage}>
             <textarea
-              className="flex-1 bg-transparent border-none focus:ring-0 resize-none py-2 px-1 text-sm min-h-[44px] max-h-48 outline-none"
+              className="w-full bg-transparent border-none focus:ring-0 resize-none py-3 px-4 text-sm min-h-[80px] max-h-60 outline-none"
               placeholder={`Message ${channelName}`}
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -139,19 +140,37 @@ export function ChatInterface({ sessionId, channelName, onThreadSelect }: ChatIn
               }}
               autoFocus
             />
-            <Button
-              type="submit"
-              size="icon"
-              disabled={!input.trim() || isSending}
-              className={cn(
-                "h-8 w-8 transition-all shrink-0",
-                input.trim() ? "bg-[#007a5a] hover:bg-[#005a44] text-white" : "bg-transparent text-muted-foreground"
-              )}
-            >
-              <Send className="w-4 h-4" />
-            </Button>
-          </div>
-        </form>
+            <div className="flex items-center justify-between p-2 pt-0">
+              <div className="flex items-center gap-1">
+                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground"><Paperclip className="w-4 h-4" /></Button>
+                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground"><Smile className="w-4 h-4" /></Button>
+                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground"><AtSign className="w-4 h-4" /></Button>
+              </div>
+              <div className="flex items-center gap-3">
+                {isSending && (
+                  <span className="text-[10px] font-bold text-indigo-500 animate-pulse flex items-center gap-1.5 uppercase tracking-wider">
+                    <RefreshCw className="w-3 h-3 animate-spin" />
+                    Nexus is thinking
+                  </span>
+                )}
+                <Button
+                  type="submit"
+                  size="icon"
+                  disabled={!input.trim() || isSending}
+                  className={cn(
+                    "h-8 w-8 transition-all shrink-0 rounded-lg",
+                    input.trim() ? "bg-[#007a5a] hover:bg-[#005a44] text-white shadow-lg" : "bg-transparent text-muted-foreground"
+                  )}
+                >
+                  <Send className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div className="mt-2 text-[10px] text-center text-muted-foreground">
+          <b>Nexus AI</b> may occasionally provide inaccurate info. Verify important code or facts.
+        </div>
       </div>
     </div>
   );

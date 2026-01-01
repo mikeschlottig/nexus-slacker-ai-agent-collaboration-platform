@@ -18,9 +18,9 @@ export interface UserProfile {
   updatedAt: number;
 }
 export const MODELS = [
-  { id: 'google-ai-studio/gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
-  { id: 'google-ai-studio/gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
   { id: 'google-ai-studio/gemini-2.0-flash', name: 'Gemini 2.0 Flash' },
+  { id: 'google-ai-studio/gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
+  { id: 'google-ai-studio/gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
 ];
 class ChatService {
   private sessionId: string;
@@ -28,6 +28,30 @@ class ChatService {
   constructor() {
     this.sessionId = crypto.randomUUID();
     this.baseUrl = `/api/chat/${this.sessionId}`;
+  }
+  private async request<T>(path: string, options?: RequestInit): Promise<ChatResponse<T>> {
+    try {
+      const response = await fetch(path, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...options?.headers,
+        },
+      });
+      if (!response.ok) {
+        let errorMsg = `Server error: ${response.status}`;
+        try {
+          const errData = await response.json();
+          errorMsg = errData.error || errorMsg;
+        } catch { /* ignore parse error */ }
+        return { success: false, error: errorMsg };
+      }
+      const data = await response.json();
+      return { success: true, data: data.data };
+    } catch (error) {
+      console.error(`API Request failed [${path}]:`, error);
+      return { success: false, error: error instanceof Error ? error.message : 'Network request failed' };
+    }
   }
   async sendMessage(
     message: string,
@@ -41,7 +65,10 @@ class ChatService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message, model, stream: !!onChunk, threadId }),
       });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+        return { success: false, error: err.error || 'Failed to send message' };
+      }
       if (onChunk && response.body) {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
@@ -57,98 +84,51 @@ class ChatService {
         }
         return { success: true };
       }
-      return await response.json();
+      const data = await response.json();
+      return { success: true, data: data.data };
     } catch (error) {
-      return { success: false, error: 'Failed to send message' };
+      return { success: false, error: 'Failed to connect to agent service' };
     }
   }
   async getMessages(): Promise<ChatResponse> {
-    try {
-      const response = await fetch(`${this.baseUrl}/messages`);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return await response.json();
-    } catch (error) {
-      return { success: false, error: 'Failed to load messages' };
-    }
+    return this.request<ChatState>(`${this.baseUrl}/messages`);
   }
-  // Workspace APIs
   async listWorkspaces(): Promise<ChatResponse<Workspace[]>> {
-    try {
-      const response = await fetch('/api/workspaces');
-      return await response.json();
-    } catch (error) {
-      return { success: false, error: 'Failed to list workspaces' };
-    }
+    return this.request<Workspace[]>('/api/workspaces');
   }
   async createWorkspace(name: string, color: string): Promise<ChatResponse<Workspace>> {
-    try {
-      const response = await fetch('/api/workspaces', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, color })
-      });
-      return await response.json();
-    } catch (error) {
-      return { success: false, error: 'Failed to create workspace' };
-    }
+    return this.request<Workspace>('/api/workspaces', {
+      method: 'POST',
+      body: JSON.stringify({ name, color })
+    });
   }
-  // Profile APIs
   async getUserProfile(): Promise<ChatResponse<UserProfile>> {
-    try {
-      const response = await fetch('/api/user/profile');
-      return await response.json();
-    } catch (error) {
-      return { success: false, error: 'Failed to get profile' };
-    }
+    return this.request<UserProfile>('/api/user/profile');
   }
   async updateUserProfile(profile: Partial<UserProfile>): Promise<ChatResponse<UserProfile>> {
-    try {
-      const response = await fetch('/api/user/profile', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(profile)
-      });
-      return await response.json();
-    } catch (error) {
-      return { success: false, error: 'Failed to update profile' };
-    }
+    return this.request<UserProfile>('/api/user/profile', {
+      method: 'PUT',
+      body: JSON.stringify(profile)
+    });
   }
-  // Session APIs
   async listSessions(workspaceId?: string): Promise<ChatResponse<SessionInfo[]>> {
-    try {
-      const url = workspaceId ? `/api/sessions?workspaceId=${encodeURIComponent(workspaceId)}` : '/api/sessions';
-      const response = await fetch(url);
-      return await response.json();
-    } catch (error) {
-      return { success: false, error: 'Failed to list sessions' };
-    }
+    const url = workspaceId ? `/api/sessions?workspaceId=${encodeURIComponent(workspaceId)}` : '/api/sessions';
+    return this.request<SessionInfo[]>(url);
   }
   async createSession(title?: string, sessionId?: string, firstMessage?: string, workspaceId?: string): Promise<ChatResponse<{ sessionId: string; title: string }>> {
-    try {
-      const response = await fetch('/api/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, sessionId, firstMessage, workspaceId })
-      });
-      return await response.json();
-    } catch (error) {
-      return { success: false, error: 'Failed to create session' };
-    }
+    return this.request<{ sessionId: string; title: string }>('/api/sessions', {
+      method: 'POST',
+      body: JSON.stringify({ title, sessionId, firstMessage, workspaceId })
+    });
   }
   async updateModel(model: string): Promise<ChatResponse> {
-    try {
-      const response = await fetch(`${this.baseUrl}/model`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model })
-      });
-      return await response.json();
-    } catch (error) {
-      return { success: false, error: 'Failed to update model' };
-    }
+    return this.request(`${this.baseUrl}/model`, {
+      method: 'POST',
+      body: JSON.stringify({ model })
+    });
   }
   switchSession(sessionId: string): void {
-    if (!sessionId) return;
+    if (!sessionId || typeof sessionId !== 'string') return;
     this.sessionId = sessionId;
     this.baseUrl = `/api/chat/${sessionId}`;
   }
