@@ -9,19 +9,17 @@ import type { Message } from '../../../worker/types';
 interface ChatInterfaceProps {
   sessionId: string;
   channelName: string;
+  onThreadSelect: (msg: Message) => void;
 }
-export function ChatInterface({ sessionId, channelName }: ChatInterfaceProps) {
+export function ChatInterface({ sessionId, channelName, onThreadSelect }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [streamingMessage, setStreamingMessage] = useState('');
   const [currentModel, setCurrentModel] = useState('');
-  // Use a ref to track streaming content to avoid dependency loops in pollers
   const streamingRef = useRef('');
   const fetchMessages = useCallback(async (isBackground = false) => {
-    // If we are currently streaming via handleSendMessage, skip background polling
-    // to avoid state flickering or inconsistent history
     if (streamingRef.current && isBackground) return;
     try {
       const res = await chatService.getMessages();
@@ -49,7 +47,6 @@ export function ChatInterface({ sessionId, channelName }: ChatInterfaceProps) {
     setIsSending(true);
     setStreamingMessage('');
     streamingRef.current = '';
-    // Optimistic update for user message
     const tempId = crypto.randomUUID();
     const optimisticMsg: Message = {
       id: tempId,
@@ -61,7 +58,7 @@ export function ChatInterface({ sessionId, channelName }: ChatInterfaceProps) {
     try {
       const res = await chatService.sendMessage(
         userMessageContent,
-        undefined, 
+        undefined,
         (chunk) => {
           streamingRef.current += chunk;
           setStreamingMessage(streamingRef.current);
@@ -81,17 +78,18 @@ export function ChatInterface({ sessionId, channelName }: ChatInterfaceProps) {
   };
   return (
     <div className="flex flex-col h-full min-w-0 overflow-hidden relative">
-      <ChannelHeader 
-        channelName={channelName} 
-        sessionId={sessionId} 
+      <ChannelHeader
+        channelName={channelName}
+        sessionId={sessionId}
         currentModel={currentModel}
         onModelUpdate={() => fetchMessages(true)}
       />
       <div className="flex-1 overflow-hidden relative">
-        <MessageList 
-          messages={messages} 
-          isLoading={isLoadingHistory} 
+        <MessageList
+          messages={messages}
+          isLoading={isLoadingHistory}
           streamingMessage={streamingMessage}
+          onThreadSelect={onThreadSelect}
         />
       </div>
       <div className="p-4 pt-0">
@@ -100,8 +98,8 @@ export function ChatInterface({ sessionId, channelName }: ChatInterfaceProps) {
           className="relative group border rounded-lg bg-white dark:bg-zinc-900 focus-within:ring-1 focus-within:ring-ring transition-shadow"
         >
           <div className="flex items-center gap-1 p-2 border-b bg-muted/30">
-            <Button type="button" variant="ghost" size="icon" className="h-7 w-7"><Smile className="w-4 h-4" /></Button>
-            <Button type="button" variant="ghost" size="icon" className="h-7 w-7"><Paperclip className="w-4 h-4" /></Button>
+            <Button type="button" variant="ghost" size="icon" className="h-7 w-7"><Smile className="w-4 h-4 text-muted-foreground" /></Button>
+            <Button type="button" variant="ghost" size="icon" className="h-7 w-7"><Paperclip className="w-4 h-4 text-muted-foreground" /></Button>
           </div>
           <div className="flex items-end p-2 gap-2">
             <textarea

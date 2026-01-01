@@ -4,13 +4,15 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { formatTime } from '@/lib/chat';
 import { cn } from '@/lib/utils';
-import { Bot, Wrench, ChevronRight, ChevronDown } from 'lucide-react';
+import { Bot, Wrench, ChevronRight, ChevronDown, MessageSquare } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { Message, ToolCall } from '../../../worker/types';
 interface MessageItemProps {
   message: Message;
   isFirstInGroup: boolean;
   isStreaming?: boolean;
+  onReplyClick?: (msg: Message) => void;
 }
 function ToolCallCard({ tool }: { tool: ToolCall }) {
   const [isOpen, setIsOpen] = React.useState(false);
@@ -58,13 +60,28 @@ function ToolCallCard({ tool }: { tool: ToolCall }) {
     </Collapsible>
   );
 }
-export function MessageItem({ message, isFirstInGroup, isStreaming }: MessageItemProps) {
+export function MessageItem({ message, isFirstInGroup, isStreaming, onReplyClick }: MessageItemProps) {
   const isAssistant = message.role === 'assistant';
   return (
     <div className={cn(
-      "group flex gap-4 px-2 py-1 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 rounded-md transition-colors relative",
+      "group flex gap-4 px-4 py-1 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 rounded-md transition-colors relative",
       !isFirstInGroup && "mt-0"
     )}>
+      <div className="absolute right-4 top-0 opacity-0 group-hover:opacity-100 transition-opacity z-10 bg-white dark:bg-zinc-900 border rounded-md shadow-sm p-0.5 flex">
+        <TooltipProvider>
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+              <button 
+                className="p-1.5 hover:bg-muted rounded"
+                onClick={() => onReplyClick?.(message)}
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="text-[10px] font-bold">Reply in Thread</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
       <div className="w-9 shrink-0 flex justify-center">
         {isFirstInGroup ? (
           <div className={cn(
@@ -92,7 +109,7 @@ export function MessageItem({ message, isFirstInGroup, isStreaming }: MessageIte
         )}
         <div className={cn(
           "text-sm leading-relaxed prose prose-zinc dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:p-0 prose-pre:bg-transparent",
-          isStreaming && "after:content-['���'] after:ml-0.5 after:animate-pulse after:text-indigo-500"
+          isStreaming && "after:content-['...'] after:ml-0.5 after:animate-pulse after:text-indigo-500"
         )}>
           <ReactMarkdown
             components={{

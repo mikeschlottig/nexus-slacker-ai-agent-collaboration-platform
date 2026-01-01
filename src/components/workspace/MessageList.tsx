@@ -8,8 +8,9 @@ interface MessageListProps {
   messages: Message[];
   isLoading: boolean;
   streamingMessage?: string;
+  onThreadSelect: (msg: Message) => void;
 }
-export function MessageList({ messages, isLoading, streamingMessage }: MessageListProps) {
+export function MessageList({ messages, isLoading, streamingMessage, onThreadSelect }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const grouped = groupMessages(messages);
   const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
@@ -42,10 +43,10 @@ export function MessageList({ messages, isLoading, streamingMessage }: MessageLi
     );
   }
   return (
-    <ScrollArea ref={scrollRef} className="h-full px-4 md:px-6">
+    <ScrollArea ref={scrollRef} className="h-full">
       <div className="flex flex-col py-6">
         {grouped.length === 0 && !streamingMessage && (
-          <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
+          <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 px-6">
             <div className="w-20 h-20 rounded-2xl bg-indigo-50 dark:bg-indigo-950/30 flex items-center justify-center border border-indigo-100 dark:border-indigo-900 shadow-sm">
               <Bot className="w-10 h-10 text-indigo-500" />
             </div>
@@ -58,19 +59,20 @@ export function MessageList({ messages, isLoading, streamingMessage }: MessageLi
           </div>
         )}
         {grouped.map((group, idx) => (
-          <div key={idx} className="space-y-1 mt-4 first:mt-0">
+          <div key={idx} className="space-y-0.5 mt-4 first:mt-0">
             {group.messages.map((msg, mIdx) => (
               <MessageItem
                 key={msg.id}
                 message={msg}
                 isFirstInGroup={mIdx === 0}
+                onReplyClick={onThreadSelect}
               />
             ))}
           </div>
         ))}
         {streamingMessage && (
           <div className="mt-4">
-            <MessageItem 
+            <MessageItem
               message={{
                 id: 'streaming-temp',
                 role: 'assistant',
@@ -79,6 +81,7 @@ export function MessageList({ messages, isLoading, streamingMessage }: MessageLi
               }}
               isFirstInGroup={messages.length === 0 || messages[messages.length - 1].role !== 'assistant'}
               isStreaming={true}
+              onReplyClick={onThreadSelect}
             />
           </div>
         )}
