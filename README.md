@@ -1,6 +1,6 @@
 # Cloudflare Workers Chat Agent
 
-[cloudflarebutton]
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/mikeschlottig/nexus-slacker-ai-agent-collaboration-platform)
 
 A production-ready full-stack chat application powered by Cloudflare Workers, Durable Objects, and Agents. Features persistent chat sessions, streaming responses, tool calling, and a modern React UI with shadcn/ui components.
 
@@ -101,7 +101,7 @@ A production-ready full-stack chat application powered by Cloudflare Workers, Du
    ```
 
 2. **One-Click Deploy**
-   [cloudflarebutton]
+   [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/mikeschlottig/nexus-slacker-ai-agent-collaboration-platform)
 
 3. **Custom Domain**
    ```bash
