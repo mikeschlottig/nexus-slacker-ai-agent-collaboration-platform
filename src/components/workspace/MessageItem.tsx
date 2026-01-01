@@ -4,17 +4,65 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { formatTime } from '@/lib/chat';
 import { cn } from '@/lib/utils';
-import { Bot, Wrench } from 'lucide-react';
-import type { Message } from '../../../worker/types';
+import { Bot, Wrench, ChevronRight, ChevronDown } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import type { Message, ToolCall } from '../../../worker/types';
 interface MessageItemProps {
   message: Message;
   isFirstInGroup: boolean;
+  isStreaming?: boolean;
 }
-export function MessageItem({ message, isFirstInGroup }: MessageItemProps) {
+function ToolCallCard({ tool }: { tool: ToolCall }) {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const hasResult = !!tool.result;
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="w-full max-w-2xl my-2">
+      <CollapsibleTrigger asChild>
+        <button className="flex items-center gap-2 text-[11px] bg-muted/50 hover:bg-muted transition-colors w-fit px-3 py-1.5 rounded-md border border-border text-muted-foreground">
+          {isOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+          <Wrench className="w-3 h-3 text-indigo-500" />
+          <span className="font-mono">tool: {tool.name}</span>
+          <span className={cn(
+            "ml-2 px-1 rounded-[2px] text-[9px] uppercase font-bold",
+            hasResult ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-amber-100 text-amber-700 animate-pulse"
+          )}>
+            {hasResult ? 'Completed' : 'Running'}
+          </span>
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-1 space-y-1">
+        <div className="bg-zinc-950 rounded-md border border-zinc-800 p-3 overflow-hidden">
+          <p className="text-[10px] uppercase font-bold text-zinc-500 mb-2 tracking-wider">Arguments</p>
+          <SyntaxHighlighter
+            style={vscDarkPlus as any}
+            language="json"
+            customStyle={{ margin: 0, padding: 0, background: 'transparent', fontSize: '11px' }}
+          >
+            {JSON.stringify(tool.arguments, null, 2)}
+          </SyntaxHighlighter>
+          {hasResult && (
+            <>
+              <div className="h-px bg-zinc-800 my-3" />
+              <p className="text-[10px] uppercase font-bold text-zinc-500 mb-2 tracking-wider">Result</p>
+              <SyntaxHighlighter
+                style={vscDarkPlus as any}
+                language="json"
+                customStyle={{ margin: 0, padding: 0, background: 'transparent', fontSize: '11px' }}
+              >
+                {JSON.stringify(tool.result, null, 2)}
+              </SyntaxHighlighter>
+            </>
+          )}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+export function MessageItem({ message, isFirstInGroup, isStreaming }: MessageItemProps) {
   const isAssistant = message.role === 'assistant';
   return (
     <div className={cn(
-      "group flex gap-4 px-2 py-1 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 rounded-md transition-colors",
+      "group flex gap-4 px-2 py-1 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 rounded-md transition-colors relative",
       !isFirstInGroup && "mt-0"
     )}>
       <div className="w-9 shrink-0 flex justify-center">
@@ -23,10 +71,10 @@ export function MessageItem({ message, isFirstInGroup }: MessageItemProps) {
             "w-9 h-9 rounded-md flex items-center justify-center font-bold text-white uppercase shadow-sm",
             isAssistant ? "bg-indigo-600" : "bg-[#E8912D]"
           )}>
-            {isAssistant ? <Bot className="w-5 h-5" /> : message.role[0]}
+            {isAssistant ? <Bot className="w-5 h-5" /> : (message.role?.[0] || 'U')}
           </div>
         ) : (
-          <div className="opacity-0 group-hover:opacity-100 text-[10px] text-muted-foreground mt-1 cursor-default">
+          <div className="opacity-0 group-hover:opacity-100 text-[10px] text-muted-foreground mt-1 cursor-default transition-opacity">
             {formatTime(message.timestamp)}
           </div>
         )}
@@ -42,13 +90,16 @@ export function MessageItem({ message, isFirstInGroup }: MessageItemProps) {
             </span>
           </div>
         )}
-        <div className="text-sm leading-relaxed prose prose-zinc dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:p-0 prose-pre:bg-transparent">
+        <div className={cn(
+          "text-sm leading-relaxed prose prose-zinc dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:p-0 prose-pre:bg-transparent",
+          isStreaming && "after:content-['���'] after:ml-0.5 after:animate-pulse after:text-indigo-500"
+        )}>
           <ReactMarkdown
             components={{
               code({ node, inline, className, children, ...props }: any) {
                 const match = /language-(\w+)/.exec(className || '');
                 return !inline && match ? (
-                  <div className="rounded-md overflow-hidden my-2 border border-border">
+                  <div className="rounded-md overflow-hidden my-2 border border-border shadow-sm">
                     <SyntaxHighlighter
                       style={vscDarkPlus as any}
                       language={match[1]}
@@ -59,7 +110,7 @@ export function MessageItem({ message, isFirstInGroup }: MessageItemProps) {
                     </SyntaxHighlighter>
                   </div>
                 ) : (
-                  <code className={cn("bg-muted px-1 rounded text-xs font-mono", className)} {...props}>
+                  <code className={cn("bg-muted px-1.5 py-0.5 rounded text-xs font-mono font-medium", className)} {...props}>
                     {children}
                   </code>
                 );
@@ -70,12 +121,9 @@ export function MessageItem({ message, isFirstInGroup }: MessageItemProps) {
           </ReactMarkdown>
         </div>
         {message.toolCalls && message.toolCalls.length > 0 && (
-          <div className="mt-2 space-y-1">
+          <div className="mt-2 flex flex-wrap gap-2">
             {message.toolCalls.map((tool, i) => (
-              <div key={i} className="flex items-center gap-2 text-[11px] bg-muted/50 w-fit px-2 py-1 rounded border border-border text-muted-foreground italic">
-                <Wrench className="w-3 h-3" />
-                <span>Executed: {tool.name}</span>
-              </div>
+              <ToolCallCard key={tool.id || i} tool={tool} />
             ))}
           </div>
         )}

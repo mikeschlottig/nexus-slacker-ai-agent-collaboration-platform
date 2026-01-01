@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ChannelHeader } from './ChannelHeader';
 import { MessageList } from './MessageList';
 import { chatService } from '@/lib/chat';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Send, Paperclip, Smile } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { Message } from '../../../worker/types';
 interface ChatInterfaceProps {
   sessionId: string;
@@ -15,17 +15,22 @@ export function ChatInterface({ sessionId, channelName }: ChatInterfaceProps) {
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
-  const fetchMessages = async () => {
+  const [streamingMessage, setStreamingMessage] = useState('');
+  const [currentModel, setCurrentModel] = useState('');
+  const fetchMessages = async (isBackground = false) => {
+    // Pause polling if we are currently streaming a response
+    if (streamingMessage && isBackground) return;
     const res = await chatService.getMessages();
     if (res.success && res.data) {
       setMessages(res.data.messages || []);
+      setCurrentModel(res.data.model || '');
     }
-    setIsLoadingHistory(false);
+    if (!isBackground) setIsLoadingHistory(false);
   };
   useEffect(() => {
     setIsLoadingHistory(true);
     fetchMessages();
-    const interval = setInterval(fetchMessages, 5000); // Simple polling
+    const interval = setInterval(() => fetchMessages(true), 5000);
     return () => clearInterval(interval);
   }, [sessionId]);
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -34,7 +39,8 @@ export function ChatInterface({ sessionId, channelName }: ChatInterfaceProps) {
     const userMessageContent = input.trim();
     setInput('');
     setIsSending(true);
-    // Optimistic update
+    setStreamingMessage('');
+    // Optimistic update for user message
     const tempId = crypto.randomUUID();
     const optimisticMsg: Message = {
       id: tempId,
@@ -43,21 +49,42 @@ export function ChatInterface({ sessionId, channelName }: ChatInterfaceProps) {
       timestamp: Date.now()
     };
     setMessages(prev => [...prev, optimisticMsg]);
-    const res = await chatService.sendMessage(userMessageContent);
-    if (!res.success) {
-      console.error('Failed to send message');
+    try {
+      const res = await chatService.sendMessage(
+        userMessageContent,
+        undefined, 
+        (chunk) => {
+          setStreamingMessage(prev => prev + chunk);
+        }
+      );
+      if (!res.success) {
+        console.error('Failed to send message');
+      }
+    } catch (err) {
+      console.error('Chat error:', err);
+    } finally {
+      setStreamingMessage('');
+      setIsSending(false);
+      fetchMessages(true);
     }
-    fetchMessages();
-    setIsSending(false);
   };
   return (
     <div className="flex flex-col h-full min-w-0 overflow-hidden relative">
-      <ChannelHeader channelName={channelName} sessionId={sessionId} />
+      <ChannelHeader 
+        channelName={channelName} 
+        sessionId={sessionId} 
+        currentModel={currentModel}
+        onModelUpdate={() => fetchMessages(true)}
+      />
       <div className="flex-1 overflow-hidden relative">
-        <MessageList messages={messages} isLoading={isLoadingHistory} />
+        <MessageList 
+          messages={messages} 
+          isLoading={isLoadingHistory} 
+          streamingMessage={streamingMessage}
+        />
       </div>
       <div className="p-4 pt-0">
-        <form 
+        <form
           onSubmit={handleSendMessage}
           className="relative group border rounded-lg bg-white dark:bg-zinc-900 focus-within:ring-1 focus-within:ring-ring transition-shadow"
         >
@@ -78,9 +105,9 @@ export function ChatInterface({ sessionId, channelName }: ChatInterfaceProps) {
                 }
               }}
             />
-            <Button 
-              type="submit" 
-              size="icon" 
+            <Button
+              type="submit"
+              size="icon"
               disabled={!input.trim() || isSending}
               className={cn(
                 "h-8 w-8 transition-all shrink-0",
@@ -94,8 +121,4 @@ export function ChatInterface({ sessionId, channelName }: ChatInterfaceProps) {
       </div>
     </div>
   );
-}
-// Helper needed inside the same file context for scoping if not using external lib immediately
-function cn(...inputs: any[]) {
-  return inputs.filter(Boolean).join(' ');
 }

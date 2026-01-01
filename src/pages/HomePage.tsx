@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { WorkspaceLayout } from '@/components/workspace/WorkspaceLayout';
 import { chatService } from '@/lib/chat';
 import type { SessionInfo } from '../../worker/types';
@@ -7,19 +7,30 @@ export function HomePage() {
   const [channels, setChannels] = useState<SessionInfo[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const fetchSessions = async () => {
+  const fetchSessions = useCallback(async () => {
     try {
       const response = await chatService.listSessions();
       if (response.success && response.data) {
-        setChannels(response.data);
-        if (response.data.length > 0 && !activeSessionId) {
-          setActiveSessionId(response.data[0].id);
-        } else if (response.data.length === 0) {
-          // Create default channel if none exist
+        const sessionData = response.data;
+        setChannels(sessionData);
+        // Only set active if none is selected or if current active is gone
+        setActiveSessionId(current => {
+          if (!current && sessionData.length > 0) return sessionData[0].id;
+          if (current && !sessionData.find(s => s.id === current)) return sessionData[0]?.id || null;
+          return current;
+        });
+        if (sessionData.length === 0) {
           const newSession = await chatService.createSession('#general');
           if (newSession.success && newSession.data) {
-            setChannels([newSession.data as any]);
-            setActiveSessionId(newSession.data.sessionId);
+            const created = {
+              id: newSession.data.sessionId,
+              title: newSession.data.title,
+              createdAt: Date.now(),
+              lastActive: Date.now()
+            };
+            setChannels([created]);
+            setActiveSessionId(created.id);
+            chatService.switchSession(created.id);
           }
         }
       }
@@ -29,10 +40,10 @@ export function HomePage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
   useEffect(() => {
     fetchSessions();
-  }, []);
+  }, [fetchSessions]);
   const handleChannelSelect = (id: string) => {
     setActiveSessionId(id);
     chatService.switchSession(id);
@@ -58,7 +69,7 @@ export function HomePage() {
   }
   return (
     <div className="h-screen w-screen overflow-hidden flex flex-col bg-background">
-      <WorkspaceLayout 
+      <WorkspaceLayout
         channels={channels}
         activeSessionId={activeSessionId}
         onChannelSelect={handleChannelSelect}
