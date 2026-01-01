@@ -3,6 +3,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { MessageItem } from './MessageItem';
 import { groupMessages } from '@/lib/workspace-utils';
 import { Bot } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 import type { Message } from '../../../worker/types';
 interface MessageListProps {
   messages: Message[];
@@ -11,9 +12,23 @@ interface MessageListProps {
   onThreadSelect: (msg: Message) => void;
   isThreadView?: boolean;
 }
+function MessageSkeleton() {
+  return (
+    <div className="flex gap-4 px-4 py-3">
+      <Skeleton className="w-9 h-9 rounded-md shrink-0" />
+      <div className="flex-1 space-y-2">
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-3 w-12" />
+        </div>
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-[80%]" />
+      </div>
+    </div>
+  );
+}
 export function MessageList({ messages, isLoading, streamingMessage, onThreadSelect, isThreadView = false }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  // Filter messages based on whether they are top-level or part of a thread
   const filteredMessages = isThreadView ? messages : messages.filter(m => !m.threadId);
   const grouped = groupMessages(filteredMessages);
   const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
@@ -32,15 +47,9 @@ export function MessageList({ messages, isLoading, streamingMessage, onThreadSel
   }, [messages, streamingMessage]);
   if (isLoading && filteredMessages.length === 0) {
     return (
-      <div className="flex-1 flex flex-col gap-6 p-6 animate-pulse">
-        {[1, 2, 3].map(i => (
-          <div key={i} className="flex gap-4">
-            <div className="w-10 h-10 rounded bg-muted shrink-0" />
-            <div className="flex-1 space-y-2">
-              <div className="h-4 w-32 bg-muted rounded" />
-              <div className="h-4 w-full bg-muted rounded" />
-            </div>
-          </div>
+      <div className="flex-1 flex flex-col py-6">
+        {[1, 2, 3, 4, 5].map(i => (
+          <MessageSkeleton key={i} />
         ))}
       </div>
     );
@@ -58,7 +67,7 @@ export function MessageList({ messages, isLoading, streamingMessage, onThreadSel
                 {isThreadView ? "Beginning of the thread" : "Welcome to Nexus AI"}
               </h3>
               <p className="text-muted-foreground text-sm max-w-sm mx-auto leading-relaxed">
-                {isThreadView 
+                {isThreadView
                   ? "Messages in this thread are contextually linked."
                   : "This is the very beginning of the history. You can collaborate with Humans and AI Agents here."}
               </p>

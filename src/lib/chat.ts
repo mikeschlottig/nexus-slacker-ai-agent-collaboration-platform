@@ -94,9 +94,10 @@ class ChatService {
       return { success: false, error: 'Failed to create session' };
     }
   }
-  async listSessions(): Promise<{ success: boolean; data?: SessionInfo[]; error?: string }> {
+  async listSessions(workspaceId?: string): Promise<{ success: boolean; data?: SessionInfo[]; error?: string }> {
     try {
-      const response = await fetch('/api/sessions');
+      const url = workspaceId ? `/api/sessions?workspaceId=${encodeURIComponent(workspaceId)}` : '/api/sessions';
+      const response = await fetch(url);
       return await response.json();
     } catch (error) {
       return { success: false, error: 'Failed to list sessions' };
