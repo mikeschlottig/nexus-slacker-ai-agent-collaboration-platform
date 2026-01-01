@@ -1,26 +1,34 @@
 import React from 'react';
-import { Plus, Hash, Settings, Bot, Code } from 'lucide-react';
+import { Plus, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-export function WorkspaceRail() {
-  const workspaces = [
-    { id: 'nexus', name: 'Nexus', initials: 'N', color: 'bg-indigo-600', active: true },
-    { id: 'dev', name: 'Development', initials: 'D', color: 'bg-[#E8912D]', active: false },
-    { id: 'marketing', name: 'Marketing', initials: 'M', color: 'bg-teal-600', active: false },
-  ];
+import { motion } from 'framer-motion';
+import { MOCK_WORKSPACES } from '@/pages/HomePage';
+interface WorkspaceRailProps {
+  activeWorkspaceId: string;
+  onWorkspaceSelect: (id: string) => void;
+}
+export function WorkspaceRail({ activeWorkspaceId, onWorkspaceSelect }: WorkspaceRailProps) {
   return (
     <div className="w-[68px] flex-shrink-0 bg-[#2C092D] flex flex-col items-center py-4 gap-4 z-20">
-      {workspaces.map((ws) => (
+      {MOCK_WORKSPACES.map((ws) => (
         <TooltipProvider key={ws.id}>
           <Tooltip delayDuration={0}>
             <TooltipTrigger asChild>
-              <div className="relative group cursor-pointer">
-                {ws.active && (
-                  <div className="absolute -left-[14px] top-1/2 -translate-y-1/2 w-2 h-8 bg-white rounded-r-full" />
+              <div 
+                className="relative group cursor-pointer"
+                onClick={() => onWorkspaceSelect(ws.id)}
+              >
+                {activeWorkspaceId === ws.id && (
+                  <motion.div 
+                    layoutId="active-indicator"
+                    className="absolute -left-[14px] top-1/2 -translate-y-1/2 w-2 h-8 bg-white rounded-r-full"
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  />
                 )}
                 <div className={cn(
                   "w-9 h-9 rounded-xl flex items-center justify-center text-white font-black text-lg transition-all duration-200",
-                  ws.active ? "rounded-lg" : "hover:rounded-lg group-hover:bg-opacity-90",
+                  activeWorkspaceId === ws.id ? "rounded-lg" : "hover:rounded-lg group-hover:bg-opacity-90",
                   ws.color
                 )}>
                   {ws.initials}
@@ -31,7 +39,8 @@ export function WorkspaceRail() {
           </Tooltip>
         </TooltipProvider>
       ))}
-      <button className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-all hover:rounded-lg mt-auto">
+      <div className="flex-1" />
+      <button className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-all hover:rounded-lg">
         <Plus className="w-5 h-5" />
       </button>
       <button className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-all hover:rounded-lg">

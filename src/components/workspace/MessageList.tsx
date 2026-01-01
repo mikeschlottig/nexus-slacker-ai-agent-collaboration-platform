@@ -9,10 +9,13 @@ interface MessageListProps {
   isLoading: boolean;
   streamingMessage?: string;
   onThreadSelect: (msg: Message) => void;
+  isThreadView?: boolean;
 }
-export function MessageList({ messages, isLoading, streamingMessage, onThreadSelect }: MessageListProps) {
+export function MessageList({ messages, isLoading, streamingMessage, onThreadSelect, isThreadView = false }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const grouped = groupMessages(messages);
+  // Filter messages based on whether they are top-level or part of a thread
+  const filteredMessages = isThreadView ? messages : messages.filter(m => !m.threadId);
+  const grouped = groupMessages(filteredMessages);
   const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
     if (scrollRef.current) {
       const scrollContainer = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
@@ -27,7 +30,7 @@ export function MessageList({ messages, isLoading, streamingMessage, onThreadSel
   useEffect(() => {
     scrollToBottom(streamingMessage ? 'auto' : 'smooth');
   }, [messages, streamingMessage]);
-  if (isLoading && messages.length === 0) {
+  if (isLoading && filteredMessages.length === 0) {
     return (
       <div className="flex-1 flex flex-col gap-6 p-6 animate-pulse">
         {[1, 2, 3].map(i => (
@@ -51,9 +54,13 @@ export function MessageList({ messages, isLoading, streamingMessage, onThreadSel
               <Bot className="w-10 h-10 text-indigo-500" />
             </div>
             <div className="space-y-1">
-              <h3 className="font-black text-xl tracking-tight">Welcome to Nexus AI</h3>
+              <h3 className="font-black text-xl tracking-tight">
+                {isThreadView ? "Beginning of the thread" : "Welcome to Nexus AI"}
+              </h3>
               <p className="text-muted-foreground text-sm max-w-sm mx-auto leading-relaxed">
-                This is the very beginning of the history. You can collaborate with Humans and AI Agents here.
+                {isThreadView 
+                  ? "Messages in this thread are contextually linked."
+                  : "This is the very beginning of the history. You can collaborate with Humans and AI Agents here."}
               </p>
             </div>
           </div>
@@ -79,7 +86,7 @@ export function MessageList({ messages, isLoading, streamingMessage, onThreadSel
                 content: streamingMessage,
                 timestamp: Date.now()
               }}
-              isFirstInGroup={messages.length === 0 || messages[messages.length - 1].role !== 'assistant'}
+              isFirstInGroup={true}
               isStreaming={true}
               onReplyClick={onThreadSelect}
             />

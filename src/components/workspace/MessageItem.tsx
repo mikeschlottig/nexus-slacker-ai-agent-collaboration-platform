@@ -4,7 +4,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { formatTime } from '@/lib/chat';
 import { cn } from '@/lib/utils';
-import { Bot, Wrench, ChevronRight, ChevronDown, MessageSquare } from 'lucide-react';
+import { Bot, Wrench, ChevronRight, ChevronDown, MessageSquare, Reply } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { Message, ToolCall } from '../../../worker/types';
@@ -62,6 +62,7 @@ function ToolCallCard({ tool }: { tool: ToolCall }) {
 }
 export function MessageItem({ message, isFirstInGroup, isStreaming, onReplyClick }: MessageItemProps) {
   const isAssistant = message.role === 'assistant';
+  const hasReplies = (message.replyCount || 0) > 0;
   return (
     <div className={cn(
       "group flex gap-4 px-4 py-1 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 rounded-md transition-colors relative",
@@ -71,11 +72,11 @@ export function MessageItem({ message, isFirstInGroup, isStreaming, onReplyClick
         <TooltipProvider>
           <Tooltip delayDuration={0}>
             <TooltipTrigger asChild>
-              <button 
-                className="p-1.5 hover:bg-muted rounded"
+              <button
+                className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors"
                 onClick={() => onReplyClick?.(message)}
               >
-                <MessageSquare className="w-3.5 h-3.5" />
+                <Reply className="w-3.5 h-3.5" />
               </button>
             </TooltipTrigger>
             <TooltipContent side="top" className="text-[10px] font-bold">Reply in Thread</TooltipContent>
@@ -143,6 +144,23 @@ export function MessageItem({ message, isFirstInGroup, isStreaming, onReplyClick
               <ToolCallCard key={tool.id || i} tool={tool} />
             ))}
           </div>
+        )}
+        {hasReplies && !message.threadId && (
+          <button 
+            onClick={() => onReplyClick?.(message)}
+            className="mt-2 flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-950/30 group/thread transition-colors border border-transparent hover:border-indigo-100 dark:hover:border-indigo-900 w-fit"
+          >
+            <div className="flex -space-x-1">
+              <div className="w-5 h-5 rounded-md bg-indigo-500 flex items-center justify-center text-[7px] text-white border-2 border-background">AI</div>
+            </div>
+            <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 group-hover/thread:underline">
+              {message.replyCount} {message.replyCount === 1 ? 'reply' : 'replies'}
+            </span>
+            <span className="text-[11px] text-muted-foreground">
+              Last reply {formatTime(message.lastReplyTimestamp || 0)}
+            </span>
+            <ChevronRight className="w-3 h-3 text-indigo-400 group-hover/thread:translate-x-0.5 transition-transform" />
+          </button>
         )}
       </div>
     </div>
