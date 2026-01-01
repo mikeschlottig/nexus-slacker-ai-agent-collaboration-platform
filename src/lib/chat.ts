@@ -1,8 +1,21 @@
 import type { Message, ChatState, SessionInfo } from '../../worker/types';
-export interface ChatResponse {
+export interface ChatResponse<T = ChatState> {
   success: boolean;
-  data?: ChatState;
+  data?: T;
   error?: string;
+}
+export interface Workspace {
+  id: string;
+  name: string;
+  initials: string;
+  color: string;
+  createdAt: number;
+}
+export interface UserProfile {
+  name: string;
+  avatarColor: string;
+  status: string;
+  updatedAt: number;
 }
 export const MODELS = [
   { id: 'google-ai-studio/gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
@@ -23,7 +36,6 @@ class ChatService {
     threadId?: string
   ): Promise<ChatResponse> {
     try {
-      if (!this.sessionId) throw new Error('Session ID not initialized');
       const response = await fetch(`${this.baseUrl}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -40,9 +52,6 @@ class ChatService {
             const chunk = decoder.decode(value, { stream: true });
             if (chunk) onChunk(chunk);
           }
-        } catch (readError) {
-          console.error('Stream read error:', readError);
-          return { success: false, error: 'Stream interrupted' };
         } finally {
           reader.releaseLock();
         }
@@ -50,49 +59,71 @@ class ChatService {
       }
       return await response.json();
     } catch (error) {
-      console.error(`[ChatService] Failed to send message in ${this.sessionId}:`, error);
       return { success: false, error: 'Failed to send message' };
     }
   }
-  async getMessages(retries = 3): Promise<ChatResponse> {
+  async getMessages(): Promise<ChatResponse> {
     try {
-      if (!this.sessionId) throw new Error('Session ID not initialized');
       const response = await fetch(`${this.baseUrl}/messages`);
-      if (!response.ok) {
-        if (response.status === 500 && retries > 0) {
-          console.warn(`[ChatService] Retrying fetchMessages for ${this.sessionId} (${retries} left)`);
-          await new Promise(r => setTimeout(r, Math.pow(2, 3 - retries) * 500));
-          return this.getMessages(retries - 1);
-        }
-        throw new Error(`HTTP ${response.status}`);
-      }
-      return await response.json();
-    } catch (error) {
-      console.error(`[ChatService] Failed to get messages for ${this.sessionId}:`, error);
-      return { success: false, error: 'Failed to load messages' };
-    }
-  }
-  async clearMessages(): Promise<ChatResponse> {
-    try {
-      const response = await fetch(`${this.baseUrl}/clear`, { method: 'DELETE' });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return await response.json();
     } catch (error) {
-      console.error('Failed to clear messages:', error);
-      return { success: false, error: 'Failed to clear messages' };
+      return { success: false, error: 'Failed to load messages' };
     }
   }
-  getSessionId(): string { return this.sessionId; }
-  newSession(): void {
-    this.sessionId = crypto.randomUUID();
-    this.baseUrl = `/api/chat/${this.sessionId}`;
+  // Workspace APIs
+  async listWorkspaces(): Promise<ChatResponse<Workspace[]>> {
+    try {
+      const response = await fetch('/api/workspaces');
+      return await response.json();
+    } catch (error) {
+      return { success: false, error: 'Failed to list workspaces' };
+    }
   }
-  switchSession(sessionId: string): void {
-    if (!sessionId) return;
-    this.sessionId = sessionId;
-    this.baseUrl = `/api/chat/${sessionId}`;
+  async createWorkspace(name: string, color: string): Promise<ChatResponse<Workspace>> {
+    try {
+      const response = await fetch('/api/workspaces', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, color })
+      });
+      return await response.json();
+    } catch (error) {
+      return { success: false, error: 'Failed to create workspace' };
+    }
   }
-  async createSession(title?: string, sessionId?: string, firstMessage?: string, workspaceId?: string): Promise<{ success: boolean; data?: { sessionId: string; title: string }; error?: string }> {
+  // Profile APIs
+  async getUserProfile(): Promise<ChatResponse<UserProfile>> {
+    try {
+      const response = await fetch('/api/user/profile');
+      return await response.json();
+    } catch (error) {
+      return { success: false, error: 'Failed to get profile' };
+    }
+  }
+  async updateUserProfile(profile: Partial<UserProfile>): Promise<ChatResponse<UserProfile>> {
+    try {
+      const response = await fetch('/api/user/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profile)
+      });
+      return await response.json();
+    } catch (error) {
+      return { success: false, error: 'Failed to update profile' };
+    }
+  }
+  // Session APIs
+  async listSessions(workspaceId?: string): Promise<ChatResponse<SessionInfo[]>> {
+    try {
+      const url = workspaceId ? `/api/sessions?workspaceId=${encodeURIComponent(workspaceId)}` : '/api/sessions';
+      const response = await fetch(url);
+      return await response.json();
+    } catch (error) {
+      return { success: false, error: 'Failed to list sessions' };
+    }
+  }
+  async createSession(title?: string, sessionId?: string, firstMessage?: string, workspaceId?: string): Promise<ChatResponse<{ sessionId: string; title: string }>> {
     try {
       const response = await fetch('/api/sessions', {
         method: 'POST',
@@ -104,15 +135,6 @@ class ChatService {
       return { success: false, error: 'Failed to create session' };
     }
   }
-  async listSessions(workspaceId?: string): Promise<{ success: boolean; data?: SessionInfo[]; error?: string }> {
-    try {
-      const url = workspaceId ? `/api/sessions?workspaceId=${encodeURIComponent(workspaceId)}` : '/api/sessions';
-      const response = await fetch(url);
-      return await response.json();
-    } catch (error) {
-      return { success: false, error: 'Failed to list sessions' };
-    }
-  }
   async updateModel(model: string): Promise<ChatResponse> {
     try {
       const response = await fetch(`${this.baseUrl}/model`, {
@@ -120,11 +142,15 @@ class ChatService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model })
       });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return await response.json();
     } catch (error) {
       return { success: false, error: 'Failed to update model' };
     }
+  }
+  switchSession(sessionId: string): void {
+    if (!sessionId) return;
+    this.sessionId = sessionId;
+    this.baseUrl = `/api/chat/${sessionId}`;
   }
 }
 export const chatService = new ChatService();

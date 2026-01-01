@@ -25,6 +25,38 @@ export function coreRoutes(app: Hono<{ Bindings: Env }>) {
     });
 }
 export function userRoutes(app: Hono<{ Bindings: Env }>) {
+    // Workspace Routes
+    app.get('/api/workspaces', async (c) => {
+        const controller = getAppController(c.env);
+        const workspaces = await controller.listWorkspaces();
+        return c.json({ success: true, data: workspaces });
+    });
+    app.post('/api/workspaces', async (c) => {
+        const body = await c.req.json();
+        const controller = getAppController(c.env);
+        const workspace = {
+            id: body.id || crypto.randomUUID(),
+            name: body.name,
+            initials: body.initials || body.name.substring(0, 1).toUpperCase(),
+            color: body.color || 'bg-indigo-600',
+            createdAt: Date.now()
+        };
+        await controller.addWorkspace(workspace);
+        return c.json({ success: true, data: workspace });
+    });
+    // User Profile Routes
+    app.get('/api/user/profile', async (c) => {
+        const controller = getAppController(c.env);
+        const profile = await controller.getUserProfile();
+        return c.json({ success: true, data: profile });
+    });
+    app.put('/api/user/profile', async (c) => {
+        const body = await c.req.json();
+        const controller = getAppController(c.env);
+        const profile = await controller.updateUserProfile(body);
+        return c.json({ success: true, data: profile });
+    });
+    // Existing Session Routes
     app.get('/api/sessions', async (c) => {
         try {
             const workspaceId = c.req.query('workspaceId');
@@ -33,10 +65,7 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
             return c.json({ success: true, data: sessions });
         } catch (error) {
             console.error('Failed to list sessions:', error);
-            return c.json({
-                success: false,
-                error: 'Failed to retrieve sessions'
-            }, { status: 500 });
+            return c.json({ success: false, error: 'Failed to retrieve sessions' }, { status: 500 });
         }
     });
     app.post('/api/sessions', async (c) => {
@@ -46,86 +75,28 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
             const sessionId = providedSessionId || crypto.randomUUID();
             let sessionTitle = title;
             if (!sessionTitle) {
-                const now = new Date();
-                const dateTime = now.toLocaleString([], {
-                    month: '2-digit',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                });
                 if (firstMessage && firstMessage.trim()) {
                     const cleanMessage = firstMessage.trim().replace(/\s+/g, ' ');
-                    const truncated = cleanMessage.length > 40
-                        ? cleanMessage.slice(0, 37) + '...'
-                        : cleanMessage;
-                    sessionTitle = `${truncated} • ${dateTime}`;
+                    sessionTitle = cleanMessage.length > 40 ? cleanMessage.slice(0, 37) + '...' : cleanMessage;
                 } else {
-                    sessionTitle = `Chat ${dateTime}`;
+                    sessionTitle = '#general';
                 }
             }
             const controller = getAppController(c.env);
             await controller.addSession(sessionId, sessionTitle, workspaceId);
-            return c.json({
-                success: true,
-                data: { sessionId, title: sessionTitle }
-            });
+            return c.json({ success: true, data: { sessionId, title: sessionTitle } });
         } catch (error) {
             console.error('Failed to create session:', error);
-            return c.json({
-                success: false,
-                error: 'Failed to create session'
-            }, { status: 500 });
+            return c.json({ success: false, error: 'Failed to create session' }, { status: 500 });
         }
     });
     app.delete('/api/sessions/:sessionId', async (c) => {
         try {
             const sessionId = c.req.param('sessionId');
             const deleted = await unregisterSession(c.env, sessionId);
-            if (!deleted) {
-                return c.json({ success: false, error: 'Session not found' }, { status: 404 });
-            }
-            return c.json({ success: true, data: { deleted: true } });
+            return c.json({ success: true, data: { deleted } });
         } catch (error) {
-            console.error('Failed to delete session:', error);
             return c.json({ success: false, error: 'Failed to delete session' }, { status: 500 });
-        }
-    });
-    app.put('/api/sessions/:sessionId/title', async (c) => {
-        try {
-            const sessionId = c.req.param('sessionId');
-            const { title } = await c.req.json();
-            if (!title || typeof title !== 'string') {
-                return c.json({ success: false, error: 'Title is required' }, { status: 400 });
-            }
-            const controller = getAppController(c.env);
-            const updated = await controller.updateSessionTitle(sessionId, title);
-            if (!updated) {
-                return c.json({ success: false, error: 'Session not found' }, { status: 404 });
-            }
-            return c.json({ success: true, data: { title } });
-        } catch (error) {
-            console.error('Failed to update session title:', error);
-            return c.json({ success: false, error: 'Failed to update session title' }, { status: 500 });
-        }
-    });
-    app.get('/api/sessions/stats', async (c) => {
-        try {
-            const controller = getAppController(c.env);
-            const count = await controller.getSessionCount();
-            return c.json({ success: true, data: { totalSessions: count } });
-        } catch (error) {
-            console.error('Failed to get session stats:', error);
-            return c.json({ success: false, error: 'Failed to retrieve session stats' }, { status: 500 });
-        }
-    });
-    app.delete('/api/sessions', async (c) => {
-        try {
-            const controller = getAppController(c.env);
-            const deletedCount = await controller.clearAllSessions();
-            return c.json({ success: true, data: { deletedCount } });
-        } catch (error) {
-            console.error('Failed to clear all sessions:', error);
-            return c.json({ success: false, error: 'Failed to clear all sessions' }, { status: 500 });
         }
     });
 }
