@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ChannelHeader } from './ChannelHeader';
 import { MessageList } from './MessageList';
 import { chatService } from '@/lib/chat';
@@ -17,22 +17,30 @@ export function ChatInterface({ sessionId, channelName }: ChatInterfaceProps) {
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [streamingMessage, setStreamingMessage] = useState('');
   const [currentModel, setCurrentModel] = useState('');
-  const fetchMessages = async (isBackground = false) => {
-    // Pause polling if we are currently streaming a response
-    if (streamingMessage && isBackground) return;
-    const res = await chatService.getMessages();
-    if (res.success && res.data) {
-      setMessages(res.data.messages || []);
-      setCurrentModel(res.data.model || '');
+  // Use a ref to track streaming content to avoid dependency loops in pollers
+  const streamingRef = useRef('');
+  const fetchMessages = useCallback(async (isBackground = false) => {
+    // If we are currently streaming via handleSendMessage, skip background polling
+    // to avoid state flickering or inconsistent history
+    if (streamingRef.current && isBackground) return;
+    try {
+      const res = await chatService.getMessages();
+      if (res.success && res.data) {
+        setMessages(res.data.messages || []);
+        setCurrentModel(res.data.model || '');
+      }
+    } catch (err) {
+      console.error('Fetch error:', err);
+    } finally {
+      if (!isBackground) setIsLoadingHistory(false);
     }
-    if (!isBackground) setIsLoadingHistory(false);
-  };
+  }, []);
   useEffect(() => {
     setIsLoadingHistory(true);
     fetchMessages();
     const interval = setInterval(() => fetchMessages(true), 5000);
     return () => clearInterval(interval);
-  }, [sessionId]);
+  }, [sessionId, fetchMessages]);
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isSending) return;
@@ -40,6 +48,7 @@ export function ChatInterface({ sessionId, channelName }: ChatInterfaceProps) {
     setInput('');
     setIsSending(true);
     setStreamingMessage('');
+    streamingRef.current = '';
     // Optimistic update for user message
     const tempId = crypto.randomUUID();
     const optimisticMsg: Message = {
@@ -54,7 +63,8 @@ export function ChatInterface({ sessionId, channelName }: ChatInterfaceProps) {
         userMessageContent,
         undefined, 
         (chunk) => {
-          setStreamingMessage(prev => prev + chunk);
+          streamingRef.current += chunk;
+          setStreamingMessage(streamingRef.current);
         }
       );
       if (!res.success) {
@@ -63,6 +73,7 @@ export function ChatInterface({ sessionId, channelName }: ChatInterfaceProps) {
     } catch (err) {
       console.error('Chat error:', err);
     } finally {
+      streamingRef.current = '';
       setStreamingMessage('');
       setIsSending(false);
       fetchMessages(true);

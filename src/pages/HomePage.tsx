@@ -1,12 +1,14 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { WorkspaceLayout } from '@/components/workspace/WorkspaceLayout';
 import { chatService } from '@/lib/chat';
-import type { SessionInfo } from '../../worker/types';
+import type { SessionInfo, Message } from '../../worker/types';
 import { Toaster, toast } from '@/components/ui/sonner';
+import { TooltipProvider } from '@/components/ui/tooltip';
 export function HomePage() {
   const [channels, setChannels] = useState<SessionInfo[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [threadMessage, setThreadMessage] = useState<Message | null>(null);
   const fetchSessions = useCallback(async () => {
     try {
       const response = await chatService.listSessions();
@@ -22,7 +24,7 @@ export function HomePage() {
         if (sessionData.length === 0) {
           const newSession = await chatService.createSession('#general');
           if (newSession.success && newSession.data) {
-            const created = {
+            const created: SessionInfo = {
               id: newSession.data.sessionId,
               title: newSession.data.title,
               createdAt: Date.now(),
@@ -44,10 +46,11 @@ export function HomePage() {
   useEffect(() => {
     fetchSessions();
   }, [fetchSessions]);
-  const handleChannelSelect = (id: string) => {
+  const handleChannelSelect = useCallback((id: string) => {
     setActiveSessionId(id);
     chatService.switchSession(id);
-  };
+    setThreadMessage(null); // Clear thread when switching channels
+  }, []);
   const handleChannelCreated = async (title: string) => {
     const res = await chatService.createSession(title);
     if (res.success && res.data) {
@@ -68,17 +71,22 @@ export function HomePage() {
     );
   }
   return (
-    <div className="h-screen w-screen overflow-hidden flex flex-col bg-background">
-      <WorkspaceLayout
-        channels={channels}
-        activeSessionId={activeSessionId}
-        onChannelSelect={handleChannelSelect}
-        onChannelCreate={handleChannelCreated}
-      />
-      <Toaster richColors position="top-center" />
-      <div className="fixed bottom-4 right-4 text-[10px] text-muted-foreground/50 z-50 pointer-events-none">
-        Nexus AI • Usage Limits Apply
+    <TooltipProvider>
+      <div className="h-screen w-screen overflow-hidden flex flex-col bg-background">
+        <WorkspaceLayout
+          channels={channels}
+          activeSessionId={activeSessionId}
+          onChannelSelect={handleChannelSelect}
+          onChannelCreate={handleChannelCreated}
+          threadMessage={threadMessage}
+          onThreadSelect={setThreadMessage}
+          onThreadClose={() => setThreadMessage(null)}
+        />
+        <Toaster richColors position="top-center" />
+        <div className="fixed bottom-4 right-4 text-[10px] text-muted-foreground/50 z-50 pointer-events-none">
+          Nexus AI • Usage Limits Apply
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }
