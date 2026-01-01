@@ -3,11 +3,11 @@ import { ChannelHeader } from './ChannelHeader';
 import { MessageList } from './MessageList';
 import { chatService } from '@/lib/chat';
 import { Button } from '@/components/ui/button';
-import { Send, Paperclip, Smile } from 'lucide-react';
+import { Send, Paperclip, Smile, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Message } from '../../../worker/types';
 interface ChatInterfaceProps {
-  sessionId: string;
+  sessionId: string | null;
   channelName: string;
   onThreadSelect: (msg: Message) => void;
 }
@@ -16,24 +16,32 @@ export function ChatInterface({ sessionId, channelName, onThreadSelect }: ChatIn
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [isRetrying, setIsRetrying] = useState(false);
   const [streamingMessage, setStreamingMessage] = useState('');
   const [currentModel, setCurrentModel] = useState('');
   const streamingRef = useRef('');
   const fetchMessages = useCallback(async (isBackground = false) => {
+    if (!sessionId) return;
     if (streamingRef.current && isBackground) return;
     try {
+      if (!isBackground) setIsRetrying(false);
       const res = await chatService.getMessages();
       if (res.success && res.data) {
         setMessages(res.data.messages || []);
         setCurrentModel(res.data.model || '');
+        setIsRetrying(false);
+      } else if (res.error) {
+        if (!isBackground) setIsRetrying(true);
       }
     } catch (err) {
       console.error('Fetch error:', err);
+      if (!isBackground) setIsRetrying(true);
     } finally {
       if (!isBackground) setIsLoadingHistory(false);
     }
-  }, []);
+  }, [sessionId]);
   useEffect(() => {
+    if (!sessionId) return;
     setIsLoadingHistory(true);
     fetchMessages();
     const interval = setInterval(() => fetchMessages(true), 5000);
@@ -41,7 +49,7 @@ export function ChatInterface({ sessionId, channelName, onThreadSelect }: ChatIn
   }, [sessionId, fetchMessages]);
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isSending) return;
+    if (!input.trim() || isSending || !sessionId) return;
     const userMessageContent = input.trim();
     setInput('');
     setIsSending(true);
@@ -76,6 +84,14 @@ export function ChatInterface({ sessionId, channelName, onThreadSelect }: ChatIn
       fetchMessages(true);
     }
   };
+  if (!sessionId) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground animate-in fade-in duration-500">
+        <RefreshCw className="w-8 h-8 animate-spin mb-4 opacity-20" />
+        <p className="text-sm font-medium">Initializing Workspace Session...</p>
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col h-full min-w-0 overflow-hidden relative">
       <ChannelHeader
@@ -85,6 +101,14 @@ export function ChatInterface({ sessionId, channelName, onThreadSelect }: ChatIn
         onModelUpdate={() => fetchMessages(true)}
       />
       <div className="flex-1 overflow-hidden relative">
+        {isRetrying && (
+          <div className="absolute top-2 inset-x-0 z-20 flex justify-center pointer-events-none">
+            <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 px-3 py-1 rounded-full flex items-center gap-2 shadow-sm pointer-events-auto animate-in slide-in-from-top-2">
+              <RefreshCw className="w-3 h-3 animate-spin text-amber-600" />
+              <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400">Reconnecting to Agent...</span>
+            </div>
+          </div>
+        )}
         <MessageList
           messages={messages}
           isLoading={isLoadingHistory}
@@ -113,6 +137,7 @@ export function ChatInterface({ sessionId, channelName, onThreadSelect }: ChatIn
                   handleSendMessage(e);
                 }
               }}
+              autoFocus
             />
             <Button
               type="submit"

@@ -27,13 +27,13 @@ export function WorkspaceLayout({
   onChannelSelect,
   onChannelCreate,
   threadMessage,
-  onThreadSelect,
-  onThreadClose
+  onThreadClose,
+  onThreadSelect
 }: WorkspaceLayoutProps) {
   const isMobile = useIsMobile();
   const activeChannel = channels.find(c => c.id === activeSessionId);
   return (
-    <div className="flex h-screen w-full overflow-hidden">
+    <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
       {!isMobile && (
         <WorkspaceRail
           activeWorkspaceId={activeWorkspaceId}
@@ -41,7 +41,7 @@ export function WorkspaceLayout({
         />
       )}
       {!isMobile && (
-        <div className="w-64 flex-shrink-0 border-r bg-[#3F0E40] text-slate-100">
+        <div className="w-64 flex-shrink-0 border-r border-border/5 h-full">
           <WorkspaceSidebar
             activeWorkspaceId={activeWorkspaceId}
             channels={channels}
@@ -51,22 +51,22 @@ export function WorkspaceLayout({
           />
         </div>
       )}
-      <div className="flex-1 flex min-w-0 bg-white dark:bg-zinc-950">
-        <div className="flex-1 flex flex-col min-w-0 h-full relative">
+      <div className="flex-1 flex min-w-0 bg-background relative h-full">
+        <main className="flex-1 flex flex-col min-w-0 h-full relative">
           {isMobile && (
-            <div className="h-12 border-b flex items-center px-4 gap-3 bg-[#3F0E40] text-white shrink-0">
+            <div className="h-14 border-b flex items-center px-4 gap-3 bg-[#3F0E40] text-white shrink-0 z-10">
               <Sheet>
                 <SheetTrigger asChild>
-                  <button className="p-1 hover:bg-white/10 rounded">
+                  <button className="p-2 hover:bg-white/10 rounded-md transition-colors">
                     <Menu className="w-5 h-5" />
                   </button>
                 </SheetTrigger>
-                <SheetContent side="left" className="p-0 w-[328px] bg-[#3F0E40] border-none text-slate-100 flex">
+                <SheetContent side="left" className="p-0 w-[320px] bg-[#3F0E40] border-none text-slate-100 flex overflow-hidden">
                   <WorkspaceRail
                     activeWorkspaceId={activeWorkspaceId}
                     onWorkspaceSelect={onWorkspaceSelect}
                   />
-                  <div className="flex-1">
+                  <div className="flex-1 h-full overflow-hidden">
                     <WorkspaceSidebar
                       activeWorkspaceId={activeWorkspaceId}
                       channels={channels}
@@ -77,24 +77,35 @@ export function WorkspaceLayout({
                   </div>
                 </SheetContent>
               </Sheet>
-              <span className="font-bold truncate">{activeChannel?.title || 'Nexus'}</span>
+              <div className="flex items-center gap-2 truncate">
+                <span className="font-black truncate">{activeChannel?.title || 'Nexus'}</span>
+              </div>
             </div>
           )}
-          {activeSessionId ? (
-            <ChatInterface
-              sessionId={activeSessionId}
-              channelName={activeChannel?.title || 'Unknown Channel'}
-              onThreadSelect={onThreadSelect}
-            />
-          ) : (
-            <div className="flex-1 flex items-center justify-center text-muted-foreground">
-              Select a channel to start collaborating
-            </div>
-          )}
-          {/* Mobile Thread Sheet */}
+          <div className="flex-1 min-h-0 relative">
+            {activeSessionId ? (
+              <ChatInterface
+                sessionId={activeSessionId}
+                channelName={activeChannel?.title || 'Unknown Channel'}
+                onThreadSelect={onThreadSelect}
+              />
+            ) : (
+              <div className="h-full w-full flex flex-col items-center justify-center p-8 text-center space-y-4">
+                <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center">
+                  <Menu className="w-8 h-8 text-muted-foreground/50" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black">Welcome to Nexus</h2>
+                  <p className="text-muted-foreground text-sm max-w-xs mx-auto">
+                    Select a channel from the sidebar or browse available channels to start collaborating.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
           {isMobile && (
             <Sheet open={!!threadMessage} onOpenChange={(open) => !open && onThreadClose()}>
-              <SheetContent side="right" className="p-0 w-full sm:max-w-md border-none">
+              <SheetContent side="right" className="p-0 w-full sm:max-w-md border-none flex flex-col h-full bg-background">
                 {threadMessage && (
                   <ThreadPanel
                     parentMessage={threadMessage}
@@ -105,14 +116,16 @@ export function WorkspaceLayout({
               </SheetContent>
             </Sheet>
           )}
-        </div>
+        </main>
         <AnimatePresence>
           {threadMessage && !isMobile && (
-            <ThreadPanel
-              parentMessage={threadMessage}
-              onClose={onThreadClose}
-              channelName={activeChannel?.title}
-            />
+            <div className="h-full shrink-0">
+               <ThreadPanel
+                parentMessage={threadMessage}
+                onClose={onThreadClose}
+                channelName={activeChannel?.title}
+              />
+            </div>
           )}
         </AnimatePresence>
       </div>

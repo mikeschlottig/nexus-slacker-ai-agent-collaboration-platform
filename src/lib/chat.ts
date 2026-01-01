@@ -23,6 +23,7 @@ class ChatService {
     threadId?: string
   ): Promise<ChatResponse> {
     try {
+      if (!this.sessionId) throw new Error('Session ID not initialized');
       const response = await fetch(`${this.baseUrl}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -49,17 +50,25 @@ class ChatService {
       }
       return await response.json();
     } catch (error) {
-      console.error('Failed to send message:', error);
+      console.error(`[ChatService] Failed to send message in ${this.sessionId}:`, error);
       return { success: false, error: 'Failed to send message' };
     }
   }
-  async getMessages(): Promise<ChatResponse> {
+  async getMessages(retries = 3): Promise<ChatResponse> {
     try {
+      if (!this.sessionId) throw new Error('Session ID not initialized');
       const response = await fetch(`${this.baseUrl}/messages`);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (!response.ok) {
+        if (response.status === 500 && retries > 0) {
+          console.warn(`[ChatService] Retrying fetchMessages for ${this.sessionId} (${retries} left)`);
+          await new Promise(r => setTimeout(r, Math.pow(2, 3 - retries) * 500));
+          return this.getMessages(retries - 1);
+        }
+        throw new Error(`HTTP ${response.status}`);
+      }
       return await response.json();
     } catch (error) {
-      console.error('Failed to get messages:', error);
+      console.error(`[ChatService] Failed to get messages for ${this.sessionId}:`, error);
       return { success: false, error: 'Failed to load messages' };
     }
   }
@@ -79,6 +88,7 @@ class ChatService {
     this.baseUrl = `/api/chat/${this.sessionId}`;
   }
   switchSession(sessionId: string): void {
+    if (!sessionId) return;
     this.sessionId = sessionId;
     this.baseUrl = `/api/chat/${sessionId}`;
   }
@@ -119,5 +129,6 @@ class ChatService {
 }
 export const chatService = new ChatService();
 export const formatTime = (timestamp: number): string => {
+  if (!timestamp) return '--:--';
   return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
