@@ -1,4 +1,9 @@
 import type { Message } from '../../worker/types';
+export const MOCK_WORKSPACES = [
+  { id: 'nexus', name: 'Nexus', initials: 'N', color: 'bg-indigo-600' },
+  { id: 'dev', name: 'Development', initials: 'D', color: 'bg-[#E8912D]' },
+  { id: 'marketing', name: 'Marketing', initials: 'M', color: 'bg-teal-600' },
+];
 export interface MessageGroup {
   senderId: string;
   role: 'user' | 'assistant' | 'system';
@@ -12,12 +17,10 @@ export function groupMessages(messages: Message[]): MessageGroup[] {
   const groups: MessageGroup[] = [];
   let currentGroup: MessageGroup | null = null;
   messages.forEach((msg) => {
-    // Treat 'assistant' as one identity and others as another for simple demo
     const senderId = msg.role === 'assistant' ? 'assistant' : 'user';
-    // Group if same sender and message within 5 minutes of previous
-    const shouldGroup = 
-      currentGroup && 
-      currentGroup.senderId === senderId && 
+    const shouldGroup =
+      currentGroup &&
+      currentGroup.senderId === senderId &&
       (msg.timestamp - currentGroup.messages[currentGroup.messages.length - 1].timestamp < 300000);
     if (shouldGroup) {
       currentGroup!.messages.push(msg);

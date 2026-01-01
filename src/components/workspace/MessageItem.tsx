@@ -63,12 +63,15 @@ function ToolCallCard({ tool }: { tool: ToolCall }) {
 export function MessageItem({ message, isFirstInGroup, isStreaming, onReplyClick }: MessageItemProps) {
   const isAssistant = message.role === 'assistant';
   const hasReplies = (message.replyCount || 0) > 0;
+  // Highlight messages that are part of a thread context
+  const isThreadContext = !!message.threadId;
   return (
     <div className={cn(
-      "group flex gap-4 px-4 py-1 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 rounded-md transition-colors relative",
-      !isFirstInGroup && "mt-0"
+      "group flex gap-4 px-4 py-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 rounded-md transition-colors relative",
+      !isFirstInGroup && "mt-0",
+      isThreadContext && "bg-indigo-50/20 dark:bg-indigo-500/5"
     )}>
-      <div className="absolute right-4 top-0 opacity-0 group-hover:opacity-100 transition-opacity z-10 bg-white dark:bg-zinc-900 border rounded-md shadow-sm p-0.5 flex">
+      <div className="absolute right-4 -top-2 opacity-0 group-hover:opacity-100 transition-all z-20 bg-white dark:bg-zinc-900 border rounded-md shadow-md p-0.5 flex">
         <TooltipProvider>
           <Tooltip delayDuration={0}>
             <TooltipTrigger asChild>
@@ -76,7 +79,7 @@ export function MessageItem({ message, isFirstInGroup, isStreaming, onReplyClick
                 className="p-1.5 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors"
                 onClick={() => onReplyClick?.(message)}
               >
-                <Reply className="w-3.5 h-3.5" />
+                <Reply className="w-4 h-4" />
               </button>
             </TooltipTrigger>
             <TooltipContent side="top" className="text-[10px] font-bold">Reply in Thread</TooltipContent>
@@ -146,7 +149,7 @@ export function MessageItem({ message, isFirstInGroup, isStreaming, onReplyClick
           </div>
         )}
         {hasReplies && !message.threadId && (
-          <button 
+          <button
             onClick={() => onReplyClick?.(message)}
             className="mt-2 flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-950/30 group/thread transition-colors border border-transparent hover:border-indigo-100 dark:hover:border-indigo-900 w-fit"
           >

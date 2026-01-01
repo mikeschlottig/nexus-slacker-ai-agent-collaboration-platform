@@ -1,20 +1,29 @@
 import React, { useState } from 'react';
-import { Hash, Plus, Bot, ChevronDown, Settings, MoreHorizontal } from 'lucide-react';
+import { Hash, Plus, Bot, ChevronDown, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { MOCK_WORKSPACES } from '@/lib/workspace-utils';
 import type { SessionInfo } from '../../../worker/types';
 interface WorkspaceSidebarProps {
+  activeWorkspaceId: string;
   channels: SessionInfo[];
   activeSessionId: string | null;
   onChannelSelect: (id: string) => void;
   onChannelCreate: (title: string) => void;
 }
-export function WorkspaceSidebar({ channels, activeSessionId, onChannelSelect, onChannelCreate }: WorkspaceSidebarProps) {
+export function WorkspaceSidebar({ 
+  activeWorkspaceId, 
+  channels, 
+  activeSessionId, 
+  onChannelSelect, 
+  onChannelCreate 
+}: WorkspaceSidebarProps) {
   const [newChannelName, setNewChannelName] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const workspace = MOCK_WORKSPACES.find(w => w.id === activeWorkspaceId);
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (newChannelName.trim()) {
@@ -26,9 +35,9 @@ export function WorkspaceSidebar({ channels, activeSessionId, onChannelSelect, o
   return (
     <div className="flex flex-col h-full select-none">
       <div className="p-4 flex items-center justify-between h-14 border-b border-white/5 shrink-0 bg-[#350d36]">
-        <div className="flex items-center gap-1.5 font-black tracking-tight text-white cursor-pointer hover:bg-white/5 px-2 py-1 rounded transition-colors">
-          Nexus Workspace
-          <ChevronDown className="w-3.5 h-3.5 opacity-50" />
+        <div className="flex items-center gap-1.5 font-black tracking-tight text-white cursor-pointer hover:bg-white/5 px-2 py-1 rounded transition-colors truncate">
+          {workspace?.name || 'Workspace'}
+          <ChevronDown className="w-3.5 h-3.5 opacity-50 shrink-0" />
         </div>
       </div>
       <ScrollArea className="flex-1">
@@ -72,10 +81,10 @@ export function WorkspaceSidebar({ channels, activeSessionId, onChannelSelect, o
                   key={channel.id}
                   onClick={() => onChannelSelect(channel.id)}
                   className={cn(
-                    "w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors font-medium",
+                    "w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-all font-medium active:scale-[0.98]",
                     activeSessionId === channel.id
-                      ? "bg-[#1164A3] text-white"
-                      : "text-slate-300 hover:bg-white/10"
+                      ? "bg-[#1164A3] text-white shadow-sm"
+                      : "text-slate-300 hover:bg-white/5 hover:text-white"
                   )}
                 >
                   <Hash className="w-3.5 h-3.5 shrink-0 opacity-60" />
@@ -90,8 +99,11 @@ export function WorkspaceSidebar({ channels, activeSessionId, onChannelSelect, o
               <span>Direct Messages</span>
             </div>
             <div className="mt-1 space-y-[1px]">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm text-slate-300 hover:bg-white/10 cursor-pointer">
-                <div className="w-4 h-4 rounded-sm bg-green-500 flex items-center justify-center text-[10px] text-white font-bold">AI</div>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm text-slate-300 hover:bg-white/5 hover:text-white cursor-pointer active:scale-[0.98] transition-all">
+                <div className="relative">
+                  <div className="w-4 h-4 rounded-sm bg-indigo-500 flex items-center justify-center text-[10px] text-white font-bold">AI</div>
+                  <div className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-green-500 ring-1 ring-[#3F0E40]" />
+                </div>
                 <span>Nexus AI</span>
                 <Bot className="w-3 h-3 opacity-40 ml-auto" />
               </div>

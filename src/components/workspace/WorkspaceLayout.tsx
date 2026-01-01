@@ -10,16 +10,20 @@ import type { SessionInfo, Message } from '../../../worker/types';
 interface WorkspaceLayoutProps {
   channels: SessionInfo[];
   activeSessionId: string | null;
+  activeWorkspaceId: string;
+  onWorkspaceSelect: (id: string) => void;
   onChannelSelect: (id: string) => void;
   onChannelCreate: (title: string) => void;
   threadMessage: Message | null;
   onThreadSelect: (msg: Message) => void;
   onThreadClose: () => void;
 }
-export function WorkspaceLayout({ 
-  channels, 
-  activeSessionId, 
-  onChannelSelect, 
+export function WorkspaceLayout({
+  channels,
+  activeSessionId,
+  activeWorkspaceId,
+  onWorkspaceSelect,
+  onChannelSelect,
   onChannelCreate,
   threadMessage,
   onThreadSelect,
@@ -29,10 +33,16 @@ export function WorkspaceLayout({
   const activeChannel = channels.find(c => c.id === activeSessionId);
   return (
     <div className="flex h-screen w-full overflow-hidden">
-      {!isMobile && <WorkspaceRail />}
+      {!isMobile && (
+        <WorkspaceRail 
+          activeWorkspaceId={activeWorkspaceId} 
+          onWorkspaceSelect={onWorkspaceSelect} 
+        />
+      )}
       {!isMobile && (
         <div className="w-64 flex-shrink-0 border-r bg-[#3F0E40] text-slate-100">
           <WorkspaceSidebar
+            activeWorkspaceId={activeWorkspaceId}
             channels={channels}
             activeSessionId={activeSessionId}
             onChannelSelect={onChannelSelect}
@@ -50,14 +60,20 @@ export function WorkspaceLayout({
                     <Menu className="w-5 h-5" />
                   </button>
                 </SheetTrigger>
-                <SheetContent side="left" className="p-0 w-72 bg-[#3F0E40] border-none text-slate-100 flex">
-                  <WorkspaceRail />
-                  <WorkspaceSidebar
-                    channels={channels}
-                    activeSessionId={activeSessionId}
-                    onChannelSelect={onChannelSelect}
-                    onChannelCreate={onChannelCreate}
+                <SheetContent side="left" className="p-0 w-[328px] bg-[#3F0E40] border-none text-slate-100 flex">
+                  <WorkspaceRail 
+                    activeWorkspaceId={activeWorkspaceId} 
+                    onWorkspaceSelect={onWorkspaceSelect} 
                   />
+                  <div className="flex-1">
+                    <WorkspaceSidebar
+                      activeWorkspaceId={activeWorkspaceId}
+                      channels={channels}
+                      activeSessionId={activeSessionId}
+                      onChannelSelect={onChannelSelect}
+                      onChannelCreate={onChannelCreate}
+                    />
+                  </div>
                 </SheetContent>
               </Sheet>
               <span className="font-bold truncate">Nexus</span>
@@ -76,9 +92,10 @@ export function WorkspaceLayout({
           )}
         </div>
         {threadMessage && !isMobile && (
-          <ThreadPanel 
-            parentMessage={threadMessage} 
-            onClose={onThreadClose} 
+          <ThreadPanel
+            parentMessage={threadMessage}
+            onClose={onThreadClose}
+            channelName={activeChannel?.title}
           />
         )}
       </div>

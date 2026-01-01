@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Hash, Send, Paperclip } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { MessageItem } from './MessageItem';
 import { chatService } from '@/lib/chat';
+import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Message } from '../../../worker/types';
 interface ThreadPanelProps {
@@ -17,18 +18,18 @@ export function ThreadPanel({ parentMessage, onClose, channelName = 'general' }:
   const [isSending, setIsSending] = useState(false);
   const [streamingReply, setStreamingReply] = useState('');
   const streamingRef = useRef('');
-  const fetchThread = async () => {
+  const fetchThread = useCallback(async () => {
     const res = await chatService.getMessages();
     if (res.success && res.data) {
       const threadReplies = res.data.messages.filter(m => m.threadId === parentMessage.id);
       setReplies(threadReplies);
     }
-  };
+  }, [parentMessage.id]);
   useEffect(() => {
     fetchThread();
     const interval = setInterval(fetchThread, 4000);
     return () => clearInterval(interval);
-  }, [parentMessage.id]);
+  }, [fetchThread]);
   const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isSending) return;
@@ -37,7 +38,6 @@ export function ThreadPanel({ parentMessage, onClose, channelName = 'general' }:
     setIsSending(true);
     setStreamingReply('');
     streamingRef.current = '';
-    // Optimistic UI for user message
     const tempId = crypto.randomUUID();
     const optimisticMsg: Message = {
       id: tempId,
@@ -67,11 +67,11 @@ export function ThreadPanel({ parentMessage, onClose, channelName = 'general' }:
     }
   };
   return (
-    <motion.div 
-      initial={{ x: 400 }}
-      animate={{ x: 0 }}
-      exit={{ x: 400 }}
-      transition={{ type: "spring", damping: 25, stiffness: 200 }}
+    <motion.div
+      initial={{ x: 400, opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      exit={{ x: 400, opacity: 0 }}
+      transition={{ type: "spring", damping: 30, stiffness: 250 }}
       className="w-[400px] flex-shrink-0 flex flex-col border-l bg-white dark:bg-zinc-950 h-full shadow-xl z-30"
     >
       <header className="h-14 border-b flex items-center justify-between px-4 shrink-0 bg-white dark:bg-zinc-950">
@@ -111,7 +111,7 @@ export function ThreadPanel({ parentMessage, onClose, channelName = 'general' }:
             ))}
             <AnimatePresence>
               {streamingReply && (
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="mt-2"
@@ -134,7 +134,7 @@ export function ThreadPanel({ parentMessage, onClose, channelName = 'general' }:
         </div>
       </ScrollArea>
       <div className="p-4 bg-white dark:bg-zinc-950 border-t">
-        <form 
+        <form
           onSubmit={handleSendReply}
           className="border rounded-lg bg-white dark:bg-zinc-900 focus-within:ring-1 focus-within:ring-ring transition-shadow"
         >
@@ -153,9 +153,9 @@ export function ThreadPanel({ parentMessage, onClose, channelName = 'general' }:
             />
             <div className="flex items-center gap-1">
               <Button type="button" variant="ghost" size="icon" className="h-7 w-7"><Paperclip className="w-3.5 h-3.5 text-muted-foreground" /></Button>
-              <Button 
-                type="submit" 
-                size="icon" 
+              <Button
+                type="submit"
+                size="icon"
                 disabled={!input.trim() || isSending}
                 className={cn(
                   "h-7 w-7 transition-all shrink-0",
